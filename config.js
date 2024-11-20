@@ -1,0 +1,7 @@
+module.exports = {
+  MONGODB_HOST: process.env.MONGODB_HOST,
+  MONGODB_PORT: process.env.MONGODB_PORT,
+  MONGODB_USERNAME: process.env.MONGODB_USERNAME,
+  MONGODB_PASSWORD: process.env.MONGODB_PASSWORD,
+  MONGODB_DBNAME: process.env.MONGODB_DBNAME,
+};
