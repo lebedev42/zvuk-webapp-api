@@ -1,15 +1,24 @@
 const express = require("express");
 const mongoose = require("mongoose");
-const http = require("http");
+const cors = require("cors");
+const config = require("./config");
 
 const app = express();
 
-const config = require("./config");
+app.use(
+  cors({
+    origin: "*",
+    methods: "OPTIONS,GET,HEAD,PUT,PATCH,POST,DELETE"
+  })
+);
+
+app.use(express.json());
+
 const postSchema = new mongoose.Schema({
   author: String,
   date: String,
   text: String,
-  comments: Number,
+  comments: Number
 });
 
 const commentSchema = new mongoose.Schema({
@@ -18,7 +27,7 @@ const commentSchema = new mongoose.Schema({
   text: String,
   likes: Number,
   usersLiked: [String],
-  postId: mongoose.Schema.Types.ObjectId,
+  postId: mongoose.Schema.Types.ObjectId
 });
 
 const Post = mongoose.model("Post", postSchema);
@@ -31,38 +40,6 @@ mongoose
   )
   .then(() => console.log("Успешно подключено к MongoDB"))
   .catch((err) => console.error("Ошибка подключения к MongoDB", err));
-
-app.get("/generate-posts", async (req, res) => {
-  const posts = [
-    {
-      author: "John Doe",
-      date: "4 ч назад",
-      text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      comments: 12,
-    },
-    {
-      author: "Jane Doe",
-      date: "6 ч назад",
-      text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      comments: 1,
-    },
-    {
-      author: "John Doe",
-      date: "7 ч назад",
-      text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      comments: 2,
-    },
-  ];
-
-  try {
-    await Post.insertMany(posts);
-    res.status(201).json({
-      message: "Посты успешно сгенерированы и добавлены в базу данных",
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
 
 // Получение всех постов
 app.get("/posts", async (req, res) => {
@@ -87,10 +64,10 @@ app.get("/posts/:id", async (req, res) => {
   }
 });
 
-// Получение всех комментариев
-app.get("/comments", async (req, res) => {
+// Получение всех комментариев к посту по postId
+app.get("/posts/:postId/comments", async (req, res) => {
   try {
-    const comments = await Comment.find();
+    const comments = await Comment.find({ postId: req.params.postId });
     res.json(comments);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -115,6 +92,7 @@ app.post("/comments", async (req, res) => {
   try {
     const { author, text, postId } = req.body;
     const postExists = await Post.findById(postId);
+
     if (!postExists) {
       return res.status(404).json({ message: "Пост не найден" });
     }
@@ -125,7 +103,7 @@ app.post("/comments", async (req, res) => {
       postId,
       date: new Date().toISOString(),
       likes: 0,
-      usersLiked: [],
+      usersLiked: []
     });
 
     const savedComment = await newComment.save();
@@ -171,11 +149,93 @@ app.delete("/comments/:id", async (req, res) => {
   }
 });
 
+// Лайк комментария
+app.post("/comments/:id/like", async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    const comment = await Comment.findById(req.params.id);
+    if (!comment) {
+      return res.status(404).json({ message: "Комментарий не найден" });
+    }
+    comment.likes += 1;
+
+    if (!comment?.usersLiked) {
+      comment.usersLiked = [];
+    }
+    if (!comment.usersLiked.includes(userId)) {
+      comment.usersLiked.push(userId);
+    }
+
+    await comment.save();
+    res.json(comment);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Удаление лайка комментария
+app.post("/comments/:id/unlike", async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    const comment = await Comment.findById(req.params.id);
+    if (!comment) {
+      return res.status(404).json({ message: "Комментарий не найден" });
+    }
+
+    comment.likes = comment.likes - 1;
+
+    if (comment?.usersLiked?.length && comment.usersLiked.includes(userId)) {
+      comment.usersLiked = comment.usersLiked.filter((user) => user !== userId);
+    }
+
+    await comment.save();
+    res.json(comment);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Генерация постов
+app.get("/generate-posts", async (req, res) => {
+  // Удаление всех постов
+  await Post.deleteMany({});
+
+  const posts = [
+    {
+      author: "Звук",
+      date: "4 ч назад",
+      text: "Текст треда про продукт / разработку",
+      comments: 0
+    },
+    {
+      author: "Звук",
+      date: "6 ч назад",
+      text: "Текст треда про продукт / разработку",
+      comments: 0
+    },
+    {
+      author: "Звук",
+      date: "7 ч назад",
+      text: "Текст треда про продукт / разработку",
+      comments: 0
+    }
+  ];
+
+  try {
+    await Post.insertMany(posts);
+    res.status(201).json({
+      message: "Посты успешно сгенерированы и добавлены в базу данных"
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Запуск сервера
 const PORT = process.env.PORT || 3000;
 
-const server = http.createServer(app);
-
-server.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`Сервер запущен на порту ${PORT}`);
 });
