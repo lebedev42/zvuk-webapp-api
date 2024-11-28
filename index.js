@@ -24,6 +24,7 @@ const postSchema = new mongoose.Schema({
 
 const commentSchema = new mongoose.Schema({
   author: String,
+  userId: String,
   date: String,
   text: String,
   likes: Number,
@@ -91,7 +92,7 @@ app.get("/comments/:id", async (req, res) => {
 // Создание комментария
 app.post("/comments", async (req, res) => {
   try {
-    const { author, text, postId } = req.body;
+    const { author, text, postId, userId } = req.body;
     const postExists = await Post.findById(postId);
 
     if (!postExists) {
@@ -99,6 +100,7 @@ app.post("/comments", async (req, res) => {
     }
 
     const newComment = new Comment({
+      userId,
       author,
       text,
       postId,
